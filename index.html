@@ -15,17 +15,17 @@
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{font-family:'Barlow',system-ui,sans-serif;background:var(--panel);color:var(--text)}
-  .app{display:grid;grid-template-columns:1fr 380px;height:100vh;height:100dvh}
+
+  /* Na začiatku je vidieť len mapa. Panel sa ukáže, keď appka dostane triedu "open". */
+  .app{display:grid;grid-template-columns:1fr;height:100vh;height:100dvh}
+  .app.open{grid-template-columns:1fr 380px}
+  aside{display:none;background:var(--panel);overflow-y:auto;padding:24px}
+  .app.open aside{display:block}
   #map{background:var(--sea);outline:none}
-  aside{background:var(--panel);overflow-y:auto;padding:24px}
-  h1,h2{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin:0 0 10px;line-height:1.05}
-  h1{font-size:34px} h2{font-size:30px}
-  .muted{color:var(--muted);margin:0 0 18px}
-  .list{list-style:none;margin:0;padding:0}
-  .list button,.back{font:inherit;color:var(--text);cursor:pointer;border:0}
-  .list button{width:100%;text-align:left;padding:12px 14px;margin-bottom:6px;background:var(--panel-2);border-radius:6px;border-left:4px solid transparent}
-  .list button:hover{border-left-color:var(--pin)}
-  .back{background:none;color:var(--pin);padding:0;margin-bottom:14px;font-weight:500}
+
+  h2{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin:0 0 10px;line-height:1.05;font-size:30px}
+  .muted{color:var(--muted)}
+  .back{font:inherit;color:var(--pin);background:none;border:0;padding:0;margin-bottom:14px;font-weight:500;cursor:pointer}
   button:focus-visible{outline:2px solid var(--pin);outline-offset:2px}
   .main-photo{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:var(--panel-2);display:block}
   .empty-photo{aspect-ratio:4/3;border-radius:6px;background:var(--panel-2);display:grid;place-items:center;color:var(--muted)}
@@ -45,12 +45,12 @@
   .leaflet-tooltip{font-family:'Barlow',sans-serif;font-weight:500}
 
   @media (max-width:800px){
-    .app{grid-template-columns:1fr;grid-template-rows:55vh 1fr;grid-template-rows:55dvh 1fr}
+    .app.open{grid-template-columns:1fr;grid-template-rows:55vh 1fr;grid-template-rows:55dvh 1fr}
   }
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <div id="map" role="application" aria-label="Mapa GTA 5"></div>
   <aside id="panel" aria-live="polite"></aside>
 </div>
@@ -58,29 +58,14 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  // Rozmery tvojho obrázka mapy v pixeloch (uprav podľa súboru mapa.jpg)
-  const MAP_W = 5944, MAP_H = 8075;
+  // Názov obrázka mapy. Rozmery sa zistia automaticky, nemusíš ich nikde zadávať.
+  const IMG = 'mapa.jpg';
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let MAP_W, MAP_H, map, houses = [], markers = {}, currentId = null;
   const toLatLng = h => [MAP_H - h.y, h.x];   // y počítame zhora ako v obrázku
-
-  const map = L.map('map', {crs: L.CRS.Simple, minZoom: -2, maxZoom: 2, zoomSnap: 0.25, attributionControl: false});
-  const bounds = [[0, 0], [MAP_H, MAP_W]];
-  L.imageOverlay('mapa.jpg', bounds).addTo(map);
-  map.fitBounds(bounds);
-  map.setMaxBounds(L.latLngBounds(bounds).pad(0.2));
-
-  let houses = [], markers = {};
-
-  // Pomocník na zisťovanie súradníc pre nové domy: klikni do mapy
-  map.on('click', e => {
-    const x = Math.round(e.latlng.lng), y = Math.round(MAP_H - e.latlng.lat);
-    const box = $('#coords');
-    box.textContent = `x: ${x}, y: ${y}`;
-    box.style.display = 'block';
-    console.log(`"x": ${x}, "y": ${y}`);
-  });
 
   function setActive(id) {
     Object.entries(markers).forEach(([k, m]) => {
@@ -89,17 +74,20 @@
     });
   }
 
-  function showList() {
+  function closePanel() {
+    currentId = null;
+    $('#app').classList.remove('open');
     setActive(null);
     history.replaceState(null, '', location.pathname);
-    $('#panel').innerHTML =
-      `<h1>Domy</h1><p class="muted">Klikni na pin v mape alebo vyber dom zo zoznamu.</p>` +
-      `<ul class="list">${houses.map(h => `<li><button data-id="${esc(h.id)}">${esc(h.name)}</button></li>`).join('')}</ul>`;
+    map.invalidateSize();
   }
 
   function showHouse(id) {
     const h = houses.find(x => x.id === id);
-    if (!h) return showList();
+    if (!h) return closePanel();
+    currentId = id;
+    $('#app').classList.add('open');
+    map.invalidateSize();
     setActive(id);
     history.replaceState(null, '', '#' + id);
     map.panTo(toLatLng(h));
@@ -115,40 +103,72 @@
       ? `<dl>${Object.entries(h.details).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
 
     $('#panel').innerHTML =
-      `<button class="back" data-back>← Všetky domy</button>
+      `<button class="back" data-back>✕ Zavrieť</button>
        <h2>${esc(h.name)}</h2>${gallery}${details}<p class="desc">${esc(h.desc || '')}</p>`;
     $('#panel').scrollTop = 0;
   }
 
   // Kliky v bočnom paneli
   $('#panel').addEventListener('click', e => {
-    const item = e.target.closest('[data-id]');
     const thumb = e.target.closest('[data-photo]');
-    if (item) showHouse(item.dataset.id);
-    else if (e.target.closest('[data-back]')) showList();
+    if (e.target.closest('[data-back]')) closePanel();
     else if (thumb) {
-      const h = houses.find(x => x.id === location.hash.slice(1));
+      const h = houses.find(x => x.id === currentId);
       $('#main-photo').src = h.photos[thumb.dataset.photo];
       document.querySelectorAll('.thumbs button').forEach(b => b.classList.toggle('on', b === thumb));
     }
   });
 
-  fetch('data.json')
-    .then(r => r.json())
-    .then(data => {
-      houses = data;
-      houses.forEach(h => {
-        const m = L.marker(toLatLng(h), {icon: L.divIcon({className: 'pin', html: '<span></span>', iconSize: [26, 26], iconAnchor: [13, 26]}), title: h.name})
-          .addTo(map)
-          .bindTooltip(h.name, {direction: 'top', offset: [0, -26]})   // pri nabehnutí myšou
-          .on('click', () => showHouse(h.id));                          // po kliknutí do panelu
-        markers[h.id] = m;
-      });
-      location.hash ? showHouse(location.hash.slice(1)) : showList();
-    })
-    .catch(() => {
-      $('#panel').innerHTML = '<h1>Dáta sa nenačítali</h1><p class="muted">Skontroluj súbor data.json. Lokálne stránku spusti cez server (napr. „python -m http.server“), nie dvojklikom na súbor.</p>';
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && map) closePanel(); });
+
+  function start() {
+    map = L.map('map', {crs: L.CRS.Simple, minZoom: -6, maxZoom: 2, zoomSnap: 0.25, attributionControl: false, maxBoundsViscosity: 1.0});
+    const bounds = [[0, 0], [MAP_H, MAP_W]];
+    L.imageOverlay(IMG, bounds).addTo(map);
+    map.setMaxBounds(bounds);
+
+    // Mapa vždy vyplní celé okno, takže po stranách nezostane prázdno
+    const fillScreen = () => {
+      const z = map.getBoundsZoom(bounds, true);
+      map.setMinZoom(z);
+      if (map.getZoom() < z) map.setZoom(z);
+    };
+    map.setView([MAP_H / 2, MAP_W / 2], map.getBoundsZoom(bounds, true));
+    map.on('resize', fillScreen);
+
+    // Pomocník na zisťovanie súradníc pre nové domy: klikni do mapy
+    map.on('click', e => {
+      const x = Math.round(e.latlng.lng), y = Math.round(MAP_H - e.latlng.lat);
+      const box = $('#coords');
+      box.textContent = `x: ${x}, y: ${y}`;
+      box.style.display = 'block';
+      console.log(`"x": ${x}, "y": ${y}`);
     });
+
+    fetch('data.json')
+      .then(r => r.json())
+      .then(data => {
+        houses = data;
+        houses.forEach(h => {
+          markers[h.id] = L.marker(toLatLng(h), {icon: L.divIcon({className: 'pin', html: '<span></span>', iconSize: [26, 26], iconAnchor: [13, 26]}), title: h.name})
+            .addTo(map)
+            .bindTooltip(h.name, {direction: 'top', offset: [0, -26]})   // pri nabehnutí myšou
+            .on('click', () => showHouse(h.id));                          // po kliknutí sa otvorí panel
+        });
+        if (location.hash) showHouse(location.hash.slice(1));
+      })
+      .catch(() => {
+        const box = $('#coords');
+        box.textContent = 'Dáta sa nenačítali. Skontroluj súbor data.json.';
+        box.style.display = 'block';
+      });
+  }
+
+  // Najprv sa načíta obrázok, zistia sa jeho rozmery a až potom sa spustí mapa
+  const probe = new Image();
+  probe.onload = () => { MAP_W = probe.naturalWidth; MAP_H = probe.naturalHeight; start(); };
+  probe.onerror = () => { $('#map').textContent = 'Obrázok ' + IMG + ' sa nenašiel.'; };
+  probe.src = IMG;
 </script>
 </body>
 </html>
