@@ -16,7 +16,7 @@
   html,body{margin:0;height:100%}
   body{font-family:'Barlow',system-ui,sans-serif;background:var(--panel);color:var(--text)}
   .app{display:grid;grid-template-columns:1fr 380px;height:100vh;height:100dvh}
-  #map{background:var(--sea);outline:none;cursor:default}
+  #map{background:var(--sea);outline:none}
   aside{background:var(--panel);overflow-y:auto;padding:24px}
   h1,h2{font-family:'Barlow Condensed',sans-serif;font-weight:700;margin:0 0 10px;line-height:1.05}
   h1{font-size:34px} h2{font-size:30px}
@@ -124,19 +124,22 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && map) showList(); });
 
   function start() {
-    // Pevná mapa: nedá sa posúvať ani približovať
+    // Približovanie je zapnuté. Pri celej mape sa nič nehýbe, po priblížení sa dá mapa posúvať,
+    // ale nikdy nie mimo jej okrajov (takže po stranách nevznikne prázdno).
     map = L.map('map', {
       crs: L.CRS.Simple, minZoom: -6, maxZoom: 2, zoomSnap: 0, attributionControl: false,
-      zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
-      touchZoom: false, boxZoom: false, keyboard: false
+      maxBoundsViscosity: 1.0, keyboard: false
     });
     const bounds = [[0, 0], [MAP_H, MAP_W]];
     L.imageOverlay(IMG, bounds).addTo(map);
+    map.setMaxBounds(bounds);
 
-    // Celá mapa sa vždy zmestí do okna (aj po zmene veľkosti okna)
-    const fit = () => map.fitBounds(bounds, {animate: false});
+    // Najmenšie zobrazenie = celá mapa v okne (aj po zmene veľkosti okna)
+    let wasFit = true;
+    const fit = () => { map.setMinZoom(map.getBoundsZoom(bounds)); map.fitBounds(bounds, {animate: false}); };
     fit();
-    map.on('resize', fit);
+    map.on('zoomend', () => { wasFit = map.getZoom() <= map.getMinZoom() + 0.01; });
+    map.on('resize', () => { if (wasFit) fit(); else map.setMinZoom(map.getBoundsZoom(bounds)); });
 
     // Pomocník na zisťovanie súradníc pre nové domy: klikni do mapy
     map.on('click', e => {
