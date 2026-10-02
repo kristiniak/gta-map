@@ -218,7 +218,8 @@
       console.log(`"x": ${x}, "y": ${y}`);
     });
 
-    fetch('data.json')
+    // Dáta sa načítajú vždy čerstvé, aby sa zmeny v data.json prejavili hneď
+    fetch('data.json?v=' + Date.now(), {cache: 'no-store'})
       .then(r => r.json())
       .then(data => {
         houses = data;
