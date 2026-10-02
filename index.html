@@ -38,6 +38,23 @@
   .desc{line-height:1.55;margin:0;max-width:60ch}
   .main-photo{cursor:zoom-in}
 
+  /* Filtre */
+  .filters{margin:0 0 12px}
+  .fgroup{border-top:1px solid var(--panel-2);padding:10px 0}
+  .fgroup summary{cursor:pointer;font-weight:500;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  .fgroup summary::-webkit-details-marker{display:none}
+  .fgroup summary::after{content:'▾';color:var(--muted)}
+  .fgroup[open] summary::after{content:'▴'}
+  .fgroup .n{color:var(--pin)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font:inherit;font-size:14px;color:var(--text);background:var(--panel-2);border:1px solid transparent;
+    border-radius:999px;padding:5px 12px;cursor:pointer}
+  .chip:hover{border-color:var(--muted)}
+  .chip[aria-pressed="true"]{background:var(--pin);color:#1c2a31;font-weight:500}
+  .count{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px;color:var(--muted)}
+  .reset{font:inherit;background:none;border:0;color:var(--pin);cursor:pointer;padding:0}
+  .nomatch{color:var(--muted);padding:8px 0}
+
   /* Veľké zobrazenie fotky v strede obrazovky */
   .lightbox{position:fixed;inset:0;z-index:2000;background:rgba(10,16,20,.92);display:flex;align-items:center;justify-content:center}
   .lightbox[hidden],.lb-nav[hidden]{display:none}
@@ -66,7 +83,16 @@
 <body>
 <div class="app">
   <div id="map" role="application" aria-label="Mapa GTA 5"></div>
-  <aside id="panel" aria-live="polite"></aside>
+  <aside id="panel">
+    <div id="list-view">
+      <h1>Domy</h1>
+      <p class="muted">Klikni na pin v mape alebo vyber dom zo zoznamu. Filtre ti ukážu len domy, ktoré hľadáš.</p>
+      <div class="filters" id="filters"></div>
+      <div class="count"><span id="count"></span><button class="reset" id="reset" hidden>Zrušiť filtre</button></div>
+      <ul class="list" id="list"></ul>
+    </div>
+    <div id="detail-view" hidden></div>
+  </aside>
 </div>
 <div class="coords" id="coords"></div>
 
@@ -96,13 +122,78 @@
     });
   }
 
+  // ===== FILTRE =====
+  // Tu môžeš upraviť názvy kategórií. Prvá hodnota je „kód“, ktorý píšeš do data.json, druhá je text na stránke.
+  const FILTERS = [
+    {key: 'area', title: 'Lokalita', open: true, options: [
+      ['vinewood-hills', 'Vinewood Hills'], ['sandy-shores', 'Sandy Shores'], ['paleto-bay', 'Paleto Bay'],
+      ['mirror-park', 'Mirror Park'], ['plaz', 'Pláž']]},
+    {key: 'type', title: 'Typ', open: true, options: [
+      ['vila', 'Vily a luxusné domy'], ['dom', 'Bežné domy a bungalovy'], ['apartman', 'Apartmány a byty'],
+      ['farma', 'Farmy a chaty'], ['biznis', 'Kancelárie alebo biznis']]},
+    {key: 'price', title: 'Cena', options: [
+      ['do500k', 'do 500 000 $'], ['500k-2m', '500 000 – 2 mil. $'], ['2m-5m', '2 – 5 mil. $'], ['nad5m', 'nad 5 mil. $']]},
+    {key: 'tax', title: 'Dane z nehnuteľnosti', options: [['true', 'S daňou'], ['false', 'Bez dane']]},
+    {key: 'pool', title: 'Bazén', options: [['true', 'S bazénom'], ['false', 'Bez bazéna']]},
+    {key: 'view', title: 'Výhľad', options: [['more', 'Na more'], ['mesto', 'Na mesto'], ['priroda', 'Na prírodu a hory']]}
+  ];
+  const active = {};
+  FILTERS.forEach(f => active[f.key] = new Set());
+
+  const priceRange = p => p < 500000 ? 'do500k' : p < 2000000 ? '500k-2m' : p <= 5000000 ? '2m-5m' : 'nad5m';
+  const optLabel = (key, val) => {
+    const f = FILTERS.find(x => x.key === key);
+    const o = f && f.options.find(o => o[0] === String(val));
+    return o ? o[1] : String(val);
+  };
+  // Hodnoty domu pre daný filter (cena sa automaticky zaradí do pásma)
+  function valuesOf(h, key) {
+    if (key === 'price') return typeof h.price === 'number' ? [priceRange(h.price)] : [];
+    const v = h[key];
+    if (v === undefined || v === null) return [];
+    return (Array.isArray(v) ? v : [v]).map(String);
+  }
+  // V rámci jednej skupiny stačí splniť aspoň jednu možnosť, medzi skupinami musia platiť všetky
+  const matches = h => FILTERS.every(f => !active[f.key].size || valuesOf(h, f.key).some(v => active[f.key].has(v)));
+
+  function buildFilters() {
+    $('#filters').innerHTML = FILTERS.map(f =>
+      `<details class="fgroup"${f.open ? ' open' : ''}>
+         <summary><span>${esc(f.title)}<span class="n" data-n="${f.key}"></span></span></summary>
+         <div class="chips">${f.options.map(([v, l]) =>
+           `<button class="chip" data-f="${f.key}" data-v="${esc(v)}" aria-pressed="false">${esc(l)}</button>`).join('')}</div>
+       </details>`).join('');
+  }
+
+  function applyFilters() {
+    const shown = houses.filter(matches);
+    const ids = new Set(shown.map(h => h.id));
+    houses.forEach(h => {
+      const m = markers[h.id];
+      if (!m) return;
+      if (ids.has(h.id)) { if (!map.hasLayer(m)) m.addTo(map); }
+      else if (map.hasLayer(m)) map.removeLayer(m);
+    });
+    $('#list').innerHTML = shown.length
+      ? shown.map(h => `<li><button data-id="${esc(h.id)}">${esc(h.name)}</button></li>`).join('')
+      : '<li class="nomatch">Žiadny dom nezodpovedá výberu.</li>';
+    const any = FILTERS.some(f => active[f.key].size);
+    $('#count').textContent = any ? `Zobrazené: ${shown.length} z ${houses.length}` : `Domov: ${houses.length}`;
+    $('#reset').hidden = !any;
+    FILTERS.forEach(f => {
+      const n = active[f.key].size;
+      const badge = document.querySelector(`[data-n="${f.key}"]`);
+      if (badge) badge.textContent = n ? ` (${n})` : '';
+    });
+    setActive(currentId);
+  }
+
   function showList() {
     currentId = null;
     setActive(null);
     history.replaceState(null, '', location.pathname);
-    $('#panel').innerHTML =
-      `<h1>Domy</h1><p class="muted">Klikni na pin v mape alebo vyber dom zo zoznamu.</p>` +
-      `<ul class="list">${houses.map(h => `<li><button data-id="${esc(h.id)}">${esc(h.name)}</button></li>`).join('')}</ul>`;
+    $('#detail-view').hidden = true;
+    $('#list-view').hidden = false;
     $('#panel').scrollTop = 0;
   }
 
@@ -121,12 +212,26 @@
            `<button data-photo="${i}" class="${i === 0 ? 'on' : ''}" aria-label="Fotka ${i + 1}"><img src="${esc(p)}" alt=""></button>`).join('')}</div>`
       : `<div class="empty-photo">Zatiaľ bez fotiek</div><div class="thumbs"></div>`;
 
-    const details = h.details
-      ? `<dl>${Object.entries(h.details).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
+    // Údaje o dome: najprv tie z filtrov, potom ďalšie z "details"
+    const rows = [];
+    if (h.area) rows.push(['Lokalita', optLabel('area', h.area)]);
+    if (h.type) rows.push(['Typ', optLabel('type', h.type)]);
+    if (typeof h.price === 'number') rows.push(['Cena', h.price.toLocaleString('sk-SK') + ' $']);
+    if (typeof h.tax === 'boolean') rows.push(['Dane z nehnuteľnosti', h.tax ? 'Áno' : 'Nie']);
+    if (typeof h.pool === 'boolean') rows.push(['Bazén', h.pool ? 'Áno' : 'Nie']);
+    if (h.view) rows.push(['Výhľad', [].concat(h.view).map(v => optLabel('view', v)).join(', ')]);
+    Object.entries(h.details || {}).forEach(([k, v]) => {
+      if ((k === 'Cena' && typeof h.price === 'number') || (k === 'Štvrť' && h.area)) return;   // aby sa to neopakovalo
+      rows.push([k, v]);
+    });
+    const details = rows.length
+      ? `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
 
-    $('#panel').innerHTML =
+    $('#detail-view').innerHTML =
       `<button class="back" data-back>← Všetky domy</button>
        <h2>${esc(h.name)}</h2>${gallery}${details}<p class="desc">${esc(h.desc || '')}</p>`;
+    $('#list-view').hidden = true;
+    $('#detail-view').hidden = false;
     $('#panel').scrollTop = 0;
   }
 
@@ -155,11 +260,23 @@
   $('#panel').addEventListener('click', e => {
     const item = e.target.closest('[data-id]');
     const thumb = e.target.closest('[data-photo]');
+    const chip = e.target.closest('[data-f]');
     if (item) showHouse(item.dataset.id);
     else if (e.target.closest('[data-back]')) showList();
     else if (thumb) setPhoto(Number(thumb.dataset.photo));
     else if (e.target.closest('#main-photo')) openLightbox();   // klik na veľkú fotku
+    else if (chip) {                                            // klik na filter
+      const set = active[chip.dataset.f], v = chip.dataset.v;
+      if (set.has(v)) set.delete(v); else set.add(v);
+      chip.setAttribute('aria-pressed', String(set.has(v)));
+      applyFilters();
+    } else if (e.target.closest('#reset')) {                    // zrušiť všetky filtre
+      FILTERS.forEach(f => active[f.key].clear());
+      document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+      applyFilters();
+    }
   });
+  buildFilters();
 
   // Kliky vo veľkom zobrazení: šípky, zavrieť, tmavé pozadie
   $('#lightbox').addEventListener('click', e => {
@@ -229,10 +346,11 @@
             .bindTooltip(h.name, {direction: 'top', offset: [0, -26]})   // pri nabehnutí myšou
             .on('click', () => showHouse(h.id));                          // po kliknutí sa otvorí detail
         });
+        applyFilters();
         location.hash ? showHouse(location.hash.slice(1)) : showList();
       })
       .catch(() => {
-        $('#panel').innerHTML = '<h1>Dáta sa nenačítali</h1><p class="muted">Skontroluj súbor data.json.</p>';
+        $('#list-view').innerHTML = '<h1>Dáta sa nenačítali</h1><p class="muted">Skontroluj súbor data.json.</p>';
       });
   }
 
