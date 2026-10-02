@@ -36,6 +36,19 @@
   dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 16px}
   dt{color:var(--muted)} dd{margin:0}
   .desc{line-height:1.55;margin:0;max-width:60ch}
+  .main-photo{cursor:zoom-in}
+
+  /* Veľké zobrazenie fotky v strede obrazovky */
+  .lightbox{position:fixed;inset:0;z-index:2000;background:rgba(10,16,20,.92);display:flex;align-items:center;justify-content:center}
+  .lightbox[hidden],.lb-nav[hidden]{display:none}
+  #lb-img{max-width:min(92vw,1400px);max-height:86vh;object-fit:contain;border-radius:6px;display:block}
+  .lb-nav,.lb-close{position:absolute;border:0;background:rgba(255,255,255,.14);color:#fff;cursor:pointer;
+    border-radius:50%;width:48px;height:48px;font-size:30px;line-height:1;display:grid;place-items:center;padding:0}
+  .lb-nav:hover,.lb-close:hover{background:rgba(255,255,255,.28)}
+  .lb-prev{left:20px;top:50%;transform:translateY(-50%)}
+  .lb-next{right:20px;top:50%;transform:translateY(-50%)}
+  .lb-close{top:20px;right:20px;font-size:22px}
+  .lb-count{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:var(--muted);pointer-events:none}
 
   .pin span{display:block;width:26px;height:26px;background:var(--pin);border:3px solid var(--panel);
     border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);transition:transform .15s,background .15s}
@@ -57,6 +70,14 @@
 </div>
 <div class="coords" id="coords"></div>
 
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Fotka">
+  <button class="lb-close" data-lb="close" aria-label="Zavrieť">✕</button>
+  <button class="lb-nav lb-prev" data-lb="prev" aria-label="Predchádzajúca fotka">‹</button>
+  <img id="lb-img" alt="">
+  <button class="lb-nav lb-next" data-lb="next" aria-label="Ďalšia fotka">›</button>
+  <div class="lb-count" id="lb-count"></div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   // Názov obrázka mapy. Rozmery sa zistia automaticky, nemusíš ich nikde zadávať.
@@ -65,7 +86,7 @@
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  let MAP_W, MAP_H, map, houses = [], markers = {}, currentId = null;
+  let MAP_W, MAP_H, map, houses = [], markers = {}, currentId = null, photoIdx = 0;
   const toLatLng = h => [MAP_H - h.y, h.x];   // y počítame zhora ako v obrázku
 
   function setActive(id) {
@@ -89,6 +110,7 @@
     const h = houses.find(x => x.id === id);
     if (!h) return showList();
     currentId = id;
+    photoIdx = 0;
     setActive(id);
     history.replaceState(null, '', '#' + id);
 
@@ -108,20 +130,66 @@
     $('#panel').scrollTop = 0;
   }
 
+  // Prepnutie fotky (v paneli aj vo veľkom zobrazení)
+  function setPhoto(i) {
+    const h = houses.find(x => x.id === currentId);
+    if (!h || !h.photos || !h.photos.length) return;
+    photoIdx = (i + h.photos.length) % h.photos.length;
+    const main = $('#main-photo');
+    if (main) main.src = h.photos[photoIdx];
+    document.querySelectorAll('.thumbs button').forEach(b => b.classList.toggle('on', Number(b.dataset.photo) === photoIdx));
+    if (!$('#lightbox').hidden) renderLightbox();
+  }
+
+  function renderLightbox() {
+    const h = houses.find(x => x.id === currentId);
+    $('#lb-img').src = h.photos[photoIdx];
+    $('#lb-img').alt = h.name;
+    $('#lb-count').textContent = `${photoIdx + 1} / ${h.photos.length}`;
+    document.querySelectorAll('.lb-nav').forEach(b => b.hidden = h.photos.length < 2);
+  }
+  const openLightbox = () => { $('#lightbox').hidden = false; renderLightbox(); };
+  const closeLightbox = () => { $('#lightbox').hidden = true; };
+
   // Kliky v bočnom paneli
   $('#panel').addEventListener('click', e => {
     const item = e.target.closest('[data-id]');
     const thumb = e.target.closest('[data-photo]');
     if (item) showHouse(item.dataset.id);
     else if (e.target.closest('[data-back]')) showList();
-    else if (thumb) {
-      const h = houses.find(x => x.id === currentId);
-      $('#main-photo').src = h.photos[thumb.dataset.photo];
-      document.querySelectorAll('.thumbs button').forEach(b => b.classList.toggle('on', b === thumb));
-    }
+    else if (thumb) setPhoto(Number(thumb.dataset.photo));
+    else if (e.target.closest('#main-photo')) openLightbox();   // klik na veľkú fotku
   });
 
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && map) showList(); });
+  // Kliky vo veľkom zobrazení: šípky, zavrieť, tmavé pozadie
+  $('#lightbox').addEventListener('click', e => {
+    const act = e.target.closest('[data-lb]');
+    if (act) {
+      if (act.dataset.lb === 'close') closeLightbox();
+      else setPhoto(photoIdx + (act.dataset.lb === 'next' ? 1 : -1));
+    } else if (e.target.id !== 'lb-img') closeLightbox();
+  });
+
+  // Potiahnutie prstom doľava/doprava na mobile
+  let touchX = null;
+  $('#lightbox').addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, {passive: true});
+  $('#lightbox').addEventListener('touchend', e => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 50) setPhoto(photoIdx + (dx < 0 ? 1 : -1));
+  });
+
+  // Klávesnica: Esc zavrie, šípky prepínajú fotky
+  document.addEventListener('keydown', e => {
+    if (!$('#lightbox').hidden) {
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowRight') setPhoto(photoIdx + 1);
+      else if (e.key === 'ArrowLeft') setPhoto(photoIdx - 1);
+      return;
+    }
+    if (e.key === 'Escape' && map) showList();
+  });
 
   function start() {
     // Približovanie je zapnuté. Pri celej mape sa nič nehýbe, po priblížení sa dá mapa posúvať,
