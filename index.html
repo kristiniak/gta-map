@@ -37,6 +37,8 @@
   dt{color:var(--muted)} dd{margin:0}
   .desc{line-height:1.55;margin:0;max-width:60ch}
   .main-photo{cursor:zoom-in}
+  .video-link{display:inline-flex;align-items:center;gap:8px;margin:0 0 16px;padding:10px 16px;border-radius:999px;background:var(--pin);color:#fff;text-decoration:none;font-weight:600}
+  .video-link:hover{filter:brightness(1.1)}
 
   /* Filtre */
   .filters{margin:0 0 12px}
@@ -85,7 +87,7 @@
   <div id="map" role="application" aria-label="Mapa GTA 5"></div>
   <aside id="panel">
     <div id="list-view">
-      <h1>Domy</h1>
+      <h1>Ponuka</h1>
       <p class="muted">Klikni na pin v mape alebo vyber dom zo zoznamu. Filtre ti ukážu len domy, ktoré hľadáš.</p>
       <div class="filters" id="filters"></div>
       <div class="count"><span id="count"></span><button class="reset" id="reset" hidden>Zrušiť filtre</button></div>
@@ -227,9 +229,12 @@
     const details = rows.length
       ? `<dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
 
+    const video = h.video
+      ? `<a class="video-link" href="${esc(h.video)}" target="_blank" rel="noopener">▶ Videoprehliadka</a>` : '';
+
     $('#detail-view').innerHTML =
-      `<button class="back" data-back>← Všetky domy</button>
-       <h2>${esc(h.name)}</h2>${gallery}${details}<p class="desc">${esc(h.desc || '')}</p>`;
+      `<button class="back" data-back>← Celá ponuka</button>
+       <h2>${esc(h.name)}</h2>${gallery}${video}${details}<p class="desc">${esc(h.desc || '')}</p>`;
     $('#list-view').hidden = true;
     $('#detail-view').hidden = false;
     $('#panel').scrollTop = 0;
