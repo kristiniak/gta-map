@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapa domov – GTA 5</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -40,6 +41,20 @@
   .main-photo{cursor:zoom-in}
   .video-link{display:inline-flex;align-items:center;gap:8px;width:100%;justify-content:center;margin:4px 0 18px;padding:14px 16px;border-radius:0;background:transparent;border:1px solid var(--pin);color:var(--pin);text-decoration:none;font-weight:500;text-transform:uppercase;letter-spacing:.16em;font-size:13px;transition:background .15s,color .15s}
   .video-link:hover{background:var(--pin);color:var(--panel)}
+  button.video-link{font-family:inherit;cursor:pointer}
+
+  /* 360° prehliadka interiéru */
+  .tour{position:fixed;inset:0;z-index:2100;background:#000}
+  .tour[hidden]{display:none}
+  #pano{width:100%;height:100%}
+  .tour .lb-close{z-index:10}
+  .tour-coords{position:absolute;left:12px;bottom:12px;z-index:10;background:var(--panel);color:var(--text);
+    padding:6px 10px;font-size:14px;display:none;border:1px solid var(--pin)}
+  .pnlm-container{font-family:'Jost',sans-serif}
+  .pnlm-panorama-info{border-radius:0;background:rgba(13,13,15,.8)}
+  .pnlm-title-box{font-family:'Cormorant Garamond',serif;font-size:26px;color:var(--pin)}
+  .pnlm-tooltip span{border-radius:0;background:var(--panel);border:1px solid var(--pin);color:var(--text);font-family:'Jost',sans-serif}
+  .pnlm-tooltip span:after{border-color:var(--pin) transparent transparent transparent}
 
   /* Filtre */
   .filters{margin:0 0 12px}
@@ -108,7 +123,14 @@
   <div class="lb-count" id="lb-count"></div>
 </div>
 
+<div class="tour" id="tour" hidden role="dialog" aria-modal="true" aria-label="360° prehliadka">
+  <div id="pano"></div>
+  <button class="lb-close" data-tour-close aria-label="Zavrieť prehliadku">✕</button>
+  <div class="tour-coords" id="tour-coords"></div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <script>
   // Názov obrázka mapy. Rozmery sa zistia automaticky, nemusíš ich nikde zadávať.
   const IMG = 'mapa.jpg';
@@ -233,10 +255,12 @@
 
     const video = h.video
       ? `<a class="video-link" href="${esc(h.video)}" target="_blank" rel="noopener">▶ Videoprehliadka</a>` : '';
+    const tour = h.tour && h.tour.scenes && Object.keys(h.tour.scenes).length
+      ? `<button class="video-link" data-tour>⟳ 360° prehliadka</button>` : '';
 
     $('#detail-view').innerHTML =
       `<button class="back" data-back>← Celá ponuka</button>
-       <h2>${esc(h.name)}</h2>${gallery}${video}${details}<p class="desc">${esc(h.desc || '')}</p>`;
+       <h2>${esc(h.name)}</h2>${gallery}${tour}${video}${details}<p class="desc">${esc(h.desc || '')}</p>`;
     $('#list-view').hidden = true;
     $('#detail-view').hidden = false;
     $('#panel').scrollTop = 0;
@@ -263,6 +287,54 @@
   const openLightbox = () => { $('#lightbox').hidden = false; renderLightbox(); };
   const closeLightbox = () => { $('#lightbox').hidden = true; };
 
+  // ===== 360° PREHLIADKA =====
+  // Z "tour" v data.json sa poskladajú miestnosti (scény) a šípky medzi nimi.
+  let viewer = null;
+  function openTour() {
+    const h = houses.find(x => x.id === currentId);
+    const t = h && h.tour;
+    if (!t || !t.scenes || typeof pannellum === 'undefined') return;
+    const ids = Object.keys(t.scenes);
+    const scenes = {};
+    ids.forEach(id => {
+      const s = t.scenes[id];
+      scenes[id] = {
+        title: s.title || '', panorama: s.photo, yaw: s.yaw || 0, pitch: s.pitch || 0, hfov: 110,
+        hotSpots: (s.links || []).filter(l => t.scenes[l.to]).map(l => ({
+          type: 'scene', sceneId: l.to, yaw: l.yaw || 0, pitch: l.pitch || 0,
+          text: l.text || t.scenes[l.to].title || ''
+        }))
+      };
+    });
+    $('#tour').hidden = false;
+    viewer = pannellum.viewer('pano', {
+      default: {
+        firstScene: scenes[t.start] ? t.start : ids[0],
+        autoLoad: true, sceneFadeDuration: 800, showFullscreenCtrl: false, compass: false
+      },
+      scenes
+    });
+  }
+  function closeTour() {
+    if (viewer) { viewer.destroy(); viewer = null; }
+    $('#tour').hidden = true;
+    $('#tour-coords').style.display = 'none';
+  }
+  $('#tour').addEventListener('click', e => { if (e.target.closest('[data-tour-close]')) closeTour(); });
+
+  // Pomocník na zisťovanie pozície šípok: klikni do 360° fotky (bez ťahania) a ukáže sa yaw/pitch
+  let downAt = null;
+  $('#pano').addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+  $('#pano').addEventListener('pointerup', e => {
+    if (!viewer || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+    if (e.target.closest('.pnlm-hotspot, .pnlm-controls')) return;
+    const [pitch, yaw] = viewer.mouseEventToCoords(e).map(n => Math.round(n));
+    const box = $('#tour-coords');
+    box.textContent = `scéna: ${viewer.getScene()} · yaw: ${yaw}, pitch: ${pitch}`;
+    box.style.display = 'block';
+    console.log(`"yaw": ${yaw}, "pitch": ${pitch}`);
+  });
+
   // Kliky v bočnom paneli
   $('#panel').addEventListener('click', e => {
     const item = e.target.closest('[data-id]');
@@ -272,6 +344,7 @@
     else if (e.target.closest('[data-back]')) showList();
     else if (thumb) setPhoto(Number(thumb.dataset.photo));
     else if (e.target.closest('#main-photo')) openLightbox();   // klik na veľkú fotku
+    else if (e.target.closest('[data-tour]')) openTour();       // 360° prehliadka
     else if (chip) {                                            // klik na filter
       const set = active[chip.dataset.f], v = chip.dataset.v;
       if (set.has(v)) set.delete(v); else set.add(v);
@@ -306,6 +379,10 @@
 
   // Klávesnica: Esc zavrie, šípky prepínajú fotky
   document.addEventListener('keydown', e => {
+    if (!$('#tour').hidden) {
+      if (e.key === 'Escape') closeTour();
+      return;
+    }
     if (!$('#lightbox').hidden) {
       if (e.key === 'Escape') closeLightbox();
       else if (e.key === 'ArrowRight') setPhoto(photoIdx + 1);
