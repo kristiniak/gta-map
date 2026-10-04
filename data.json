@@ -14,6 +14,24 @@
     "tax": true,
     "pool": true,
     "view": "mesto"
+    "tour": {
+  "start": "hala",
+  "scenes": {
+    "obyvacka": {
+      "title": "Hala",
+      "photo": "img/pano1.jpg",
+      "links": [
+        { "to": "kuchyna", "yaw": 85, "pitch": -5 },
+        { "to": "schody",  "yaw": -120, "pitch": -8, "text": "Na terasu" }
+      ]
+    },
+    "kuchyna": {
+      "title": "Kuchyňa",
+      "photo": "foto/vila1/360-kuchyna.jpg",
+      "links": [ { "to": "obyvacka", "yaw": 180, "pitch": -5 } ]
+    }
+  }
+}
   },
   {
     "id": "plaz-dom",
