@@ -13,25 +13,42 @@
     "price": 5000000,
     "tax": true,
     "pool": true,
-    "view": "mesto"
+        "view": "mesto",
     "tour": {
-  "start": "hala",
-  "scenes": {
-    "obyvacka": {
-      "title": "Hala",
-      "photo": "img/pano1.jpg",
-      "links": [
-        { "to": "kuchyna", "yaw": 85, "pitch": -5 },
-        { "to": "schody",  "yaw": -120, "pitch": -8, "text": "Na terasu" }
-      ]
-    },
-    "kuchyna": {
-      "title": "Kuchyňa",
-      "photo": "foto/vila1/360-kuchyna.jpg",
-      "links": [ { "to": "obyvacka", "yaw": 180, "pitch": -5 } ]
+      "start": "hala",
+      "scenes": {
+        "hala": {
+          "title": "Hala",
+          "photo": "img/pano1.jpg",
+          "links": [
+            { "to": "schody",  "yaw": -120, "pitch": -5 },
+            { "to": "kuchyna", "yaw": 85,   "pitch": -5 }
+          ]
+        },
+        "schody": {
+          "title": "Schody",
+          "photo": "img/pano2.jpg",
+          "links": [
+            { "to": "hala", "yaw": 0, "pitch": -10 }
+          ]
+        },
+        "kuchyna": {
+          "title": "Kuchyňa",
+          "photo": "img/pano3.jpg",
+          "links": [
+            { "to": "hala",     "yaw": 180, "pitch": -5 },
+            { "to": "obyvacka", "yaw": 60,  "pitch": -5 }
+          ]
+        },
+        "obyvacka": {
+          "title": "Obývačka",
+          "photo": "img/pano4.jpg",
+          "links": [
+            { "to": "kuchyna", "yaw": -90, "pitch": -5 }
+          ]
+        }
+      }
     }
-  }
-}
   },
   {
     "id": "plaz-dom",
