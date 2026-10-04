@@ -21,8 +21,8 @@
           "title": "Hala",
           "photo": "img/pano1.jpg",
           "links": [
-            { "to": "schody",  "yaw": -120, "pitch": -5 },
-            { "to": "kuchyna", "yaw": 85,   "pitch": -5 }
+            { "to": "schody",  "yaw": -87, "pitch": -33 },
+            { "to": "kuchyna", "yaw": -2,   "pitch": -26 }
           ]
         },
         "schody": {
