@@ -20,6 +20,6 @@
     "id": "terasa",
     "name": "Terasa",
     "photo": "img/pano1terasa.jpg",
-    "links": [ { "to": "vstup-terasa", "yaw": 40, "pitch": -5 } ]
+    "links": [ { "to": "vstup-terasa", "yaw": -157, "pitch": -5 } ]
   }
 ]
