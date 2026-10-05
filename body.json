@@ -1,0 +1,18 @@
+[
+  {
+    "id": "vinewood-blvd",
+    "name": "Vinewood Boulevard",
+    "x": 1800,
+    "y": 5200,
+    "photo": "img/ulica1.jpg",
+    "links": [ { "to": "vinewood-kopec", "yaw": 40, "pitch": -5 } ]
+  },
+  {
+    "id": "vinewood-kopec",
+    "name": "Výhľad z kopca",
+    "x": 2100,
+    "y": 4800,
+    "photo": "img/ulica2.jpg",
+    "links": [ { "to": "vinewood-blvd", "yaw": -140, "pitch": -5 } ]
+  }
+]
