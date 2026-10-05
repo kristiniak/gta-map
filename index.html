@@ -322,22 +322,62 @@
     if (h) openPano(h.tour);
   }
   // Otvorí ľubovoľnú 360° prehliadku: {start, scenes:{id:{title, photo, yaw, pitch, links:[{to, yaw, pitch, text}]}}}
-  function openPano(t) {
+  // Zistí rozmery fotky z prvých pár kB súboru (bez sťahovania celej fotky)
+  const dimsCache = {};
+  function jpegDims(buf) {
+    const d = new DataView(buf);
+    if (d.getUint16(0) !== 0xFFD8) return null;
+    let i = 2;
+    while (i + 9 < d.byteLength) {
+      if (d.getUint8(i) !== 0xFF) { i++; continue; }
+      const m = d.getUint8(i + 1);
+      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC)
+        return {h: d.getUint16(i + 5), w: d.getUint16(i + 7)};
+      i += 2 + d.getUint16(i + 2);
+    }
+    return null;
+  }
+  function imgDims(url) {
+    if (!dimsCache[url]) dimsCache[url] =
+      fetch(url, {headers: {Range: 'bytes=0-131071'}})
+        .then(r => r.arrayBuffer()).then(jpegDims).catch(() => null)
+        .then(d => d || new Promise(res => {               // záloha: načíta celý obrázok
+          const im = new Image();
+          im.onload = () => res({w: im.naturalWidth, h: im.naturalHeight});
+          im.onerror = () => res(null);
+          im.src = url;
+        }));
+    return dimsCache[url];
+  }
+
+  async function openPano(t) {
     if (!t || !t.scenes || typeof pannellum === 'undefined') return;
     if (viewer) { viewer.destroy(); viewer = null; }
+    $('#tour').hidden = false;
     const ids = Object.keys(t.scenes);
+    const dims = await Promise.all(ids.map(id => imgDims(t.scenes[id].photo)));
+    if ($('#tour').hidden) return;                          // medzitým zavreté
     const scenes = {};
-    ids.forEach(id => {
-      const s = t.scenes[id];
+    ids.forEach((id, i) => {
+      const s = t.scenes[id], d = dims[i];
       scenes[id] = {
-        title: s.title || '', panorama: s.photo, yaw: s.yaw || 0, pitch: s.pitch || 0, hfov: 110,
+        title: s.title || '', panorama: s.photo, yaw: s.yaw || 0, pitch: s.pitch || 0, hfov: 100,
         hotSpots: (s.links || []).filter(l => t.scenes[l.to]).map(l => ({
           type: 'scene', sceneId: l.to, yaw: l.yaw || 0, pitch: l.pitch || 0,
           text: l.text || t.scenes[l.to].title || ''
         }))
       };
+      // Fotka, ktorá nie je presne 2:1 (chýba strop/podlaha): zobrazí sa bez natiahnutia
+      const ratio = d ? d.w / d.h : 2;
+      if (s.vaov || ratio > 2.03) {
+        Object.assign(scenes[id], {
+          haov: s.haov || 360,
+          vaov: s.vaov || Math.round(36000 * d.h / d.w) / 100,
+          vOffset: s.vOffset || 0,
+          avoidShowingBackground: true
+        });
+      }
     });
-    $('#tour').hidden = false;
     viewer = pannellum.viewer('pano', {
       default: {
         firstScene: scenes[t.start] ? t.start : ids[0],
