@@ -370,11 +370,11 @@
       // Fotka, ktorá nie je presne 2:1 (chýba strop/podlaha): zobrazí sa bez natiahnutia
       const ratio = d ? d.w / d.h : 2;
       if (s.vaov || ratio > 2.03) {
+        const vaov = s.vaov || Math.round(36000 * d.h / d.w) / 100, vOff = s.vOffset || 0;
         Object.assign(scenes[id], {
-          haov: s.haov || 360,
-          vaov: s.vaov || Math.round(36000 * d.h / d.w) / 100,
-          vOffset: s.vOffset || 0,
-          avoidShowingBackground: true
+          haov: s.haov || 360, vaov, vOffset: vOff,
+          minPitch: vOff - vaov / 2, maxPitch: vOff + vaov / 2,  // nedá sa pozrieť nad/pod fotku
+          maxHfov: Math.min(100, vaov)                           // ani oddialiť tak, aby bolo vidieť okraj
         });
       }
     });
