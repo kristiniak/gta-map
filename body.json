@@ -1,18 +1,22 @@
 [
   {
-    "id": "vinewood-blvd",
-    "name": "Vinewood Boulevard",
-    "x": 1800,
-    "y": 5200,
+    "id": "nort-conker-ave",
+    "name": "North Conker Avenue",
+    "x": 2837,
+    "y": 5183,
     "photo": "img/ulica1.jpg",
-    "links": [ { "to": "vinewood-kopec", "yaw": 40, "pitch": -5 } ]
+    "links": [ { "to": "vstup-terasu", "yaw": 40, "pitch": -5 } ]
   },
   {
-    "id": "vinewood-kopec",
-    "name": "Výhľad z kopca",
-    "x": 2100,
-    "y": 4800,
+    "id": "vstup-terasa",
+    "name": "Vstup na terasu",
     "photo": "img/ulica2.jpg",
-    "links": [ { "to": "vinewood-blvd", "yaw": -140, "pitch": -5 } ]
+    "links": [ { "to": "terasa", "yaw": -140, "pitch": -5 } ]
+  },
+   {
+    "id": "terasa",
+    "name": "Terasa",
+    "photo": "img/ulica2.jpg",
+    "links": [ { "to": "terasa", "yaw": -140, "pitch": -5 } ]
   }
 ]
