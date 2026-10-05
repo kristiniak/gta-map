@@ -4,7 +4,7 @@
     "name": "North Conker Avenue",
     "x": 2837,
     "y": 5183,
-    "photo": "img/ulica1.jpg",
+    "photo": "img/pano1outside.jpg",
     "links": [ { "to": "vstup-terasu", "yaw": 40, "pitch": -5 } ]
   },
   {
