@@ -5,7 +5,7 @@
     "x": 2837,
     "y": 5183,
     "photo": "img/pano1outside.jpg",
-    "links": [ { "to": "vstup-terasu", "yaw": 40, "pitch": -5 } ]
+    "links": [ { "to": "vstup-terasu", "yaw": 158, "pitch": -25 } ]
   },
   {
     "id": "vstup-terasa",
