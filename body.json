@@ -10,7 +10,7 @@
   {
     "id": "vstup-terasa",
     "name": "Vstup na terasu",
-    "photo": "img/ulica2.jpg",
+    "photo": "img/pano1terasavstup.jpg",
     "links": [
       { "to": "nort-conker-ave", "yaw": 0, "pitch": -10, "text": "Späť na ulicu" },
       { "to": "terasa", "yaw": -140, "pitch": -5 }
