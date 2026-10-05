@@ -5,18 +5,21 @@
     "x": 2837,
     "y": 5183,
     "photo": "img/pano1outside.jpg",
-    "links": [ { "to": "vstup-terasu", "yaw": 158, "pitch": -25 } ]
+    "links": [ { "to": "vstup-terasa", "yaw": 158, "pitch": -25, "text": "Cez bránku" } ]
   },
   {
     "id": "vstup-terasa",
     "name": "Vstup na terasu",
     "photo": "img/ulica2.jpg",
-    "links": [ { "to": "terasa", "yaw": -140, "pitch": -5 } ]
+    "links": [
+      { "to": "nort-conker-ave", "yaw": 0, "pitch": -10, "text": "Späť na ulicu" },
+      { "to": "terasa", "yaw": -140, "pitch": -5 }
+    ]
   },
-   {
+  {
     "id": "terasa",
     "name": "Terasa",
     "photo": "img/ulica2.jpg",
-    "links": [ { "to": "terasa", "yaw": -140, "pitch": -5 } ]
+    "links": [ { "to": "vstup-terasa", "yaw": 40, "pitch": -5 } ]
   }
 ]
