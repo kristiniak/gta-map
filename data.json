@@ -19,7 +19,7 @@
       "scenes": {
         "hala": {
           "title": "Hala",
-          "photo": "img/pano1.jpg",
+          "photo": "img/pano1chodba.jpg",
           "links": [
             { "to": "schody",  "yaw": -87, "pitch": -33 },
             { "to": "kuchyna", "yaw": -2,   "pitch": -26 }
