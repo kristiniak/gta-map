@@ -515,11 +515,7 @@
   function allPoints() {
     const onMap = p => Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y));
     const pts = streetPoints.filter(onMap).map(p => ({...p, x: Number(p.x), y: Number(p.y), kind: 'street'}));   // body bez x/y nie sú v mape, ide sa na ne len šípkou
-    houses.forEach(h => {
-      if (h.tour && h.tour.scenes && Object.keys(h.tour.scenes).length)
-        pts.push({id: 'house:' + h.id, name: h.name, x: h.x, y: h.y, kind: 'house', house: h});
-    });
-    return pts;
+    return pts;   // panáčik ukazuje len body z body.json (prehliadky domov sa otvárajú tlačidlom v detaile domu)
   }
 
   // Zobrazí/skryje modré body v mape
